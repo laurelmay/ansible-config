@@ -1,0 +1,22 @@
+web:
+  hosts:
+    myip:
+      http_port: 80
+      https_port: 443
+      domain_name: myip.kylelaker.com
+      alt_names:
+        - v4.myip.kylelaker.com
+        - v6.myip.kylelaker.com
+      nginx_config: myip
+  vars:
+    acme_challenge_type: http-01
+    # acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+    acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    acme_version: 2
+    acme_terms_agreed: 1
+    letsencrypt_dir: /etc/letsencrypt
+    letsencrypt_keys_dir: /etc/letsencrypt/keys
+    letsencrypt_csrs_dir: /etc/letsencrypt/csrs
+    letsencrypt_certs_dir: /etc/letsencrypt/certs
+    letsencrypt_account_key: /etc/letsencrypt/account/account.key
+    nginx_base_well_known: /var/www/html/.well-known

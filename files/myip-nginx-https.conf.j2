@@ -1,0 +1,28 @@
+server {
+  listen      {{ https_port }} ssl;
+  listen [::]:{{ https_port }} ssl ipv6only=on;
+  listen      {{ https_port }} quic reuseport;
+  listen [::]:{{ https_port }} quic reuseport;
+  http2 on;
+
+  server_name {{ ([domain_name] + alt_names) | join(' ') }};
+
+  ssl_certificate {{ letsencrypt_certs_dir }}/fullchain_{{ domain_name }}.crt;
+  ssl_certificate_key {{ letsencrypt_keys_dir }}/{{ domain_name }}.key;
+
+  ssl_protocols TLSv1.3;
+  ssl_ciphers "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384";
+  ssl_prefer_server_ciphers on;
+
+  location = / {
+    gzip off;
+    default_type "text/plain";
+    add_header Alt-Svc 'h3=":443"; ma=86400';
+    return 200 $remote_addr;
+  }
+
+  location /.well-known/ {
+    root {{ nginx_base_well_known }};
+  }
+
+}

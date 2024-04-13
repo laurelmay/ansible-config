@@ -1,0 +1,132 @@
+---
+- name: Test connection
+  hosts: all
+  tasks:
+    - name: Ping hosts
+      ansible.builtin.ping:
+
+- name: Setup Nginx
+  hosts: web
+  become: true
+  tasks:
+    - name: Setup Nginx repository key
+      ansible.builtin.apt_key:
+        id: 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62
+        url: https://nginx.org/keys/nginx_signing.key
+        keyring: /etc/apt/keyrings/nginx-archive-keyring.gpg
+        state: present
+    - name: Setup Nginx repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [signed-by=/etc/apt/keyrings/nginx-archive-keyring.gpg]
+          http://nginx.org/packages/mainline/ubuntu
+          {{ ansible_distribution_release }}
+          nginx
+        state: present
+        filename: nginx
+    - name: Set nginx repository preference
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/99nginx
+        content: |
+          Package: *
+          Pin: origin nginx.org
+          Pin: release o=nginx
+          Pin-Priority: 900
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: latest
+        update_cache: yes
+      notify:
+        - Restart nginx
+    - name: Delete default nginx config
+      ansible.builtin.file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+    - name: Install HTTP config
+      ansible.builtin.template:
+        src: files/{{ nginx_config }}-nginx-http.conf.j2
+        dest: /etc/nginx/conf.d/http.conf
+      notify:
+        - Reload nginx
+    - name: Enable nginx systemd service
+      ansible.builtin.service:
+        name: nginx
+        enabled: true
+        state: started
+    - name: Create Let's Encrypt directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        recurse: true
+      with_items:
+        - "{{ letsencrypt_dir }}"
+        - "{{ letsencrypt_dir }}/account"
+        - "{{ letsencrypt_keys_dir }}"
+        - "{{ letsencrypt_csrs_dir }}"
+        - "{{ letsencrypt_certs_dir }}"
+        - "{{ nginx_base_well_known }}/acme-challenge"
+    - name: Generate Let's Encrypt account key
+      community.crypto.openssl_privatekey:
+        path: "{{ letsencrypt_account_key }}"
+        type: RSA
+        size: 4096
+    - name: Generate TLS private key
+      community.crypto.openssl_privatekey:
+        path: "{{ letsencrypt_keys_dir }}/{{ domain_name }}.key"
+        type: ECC
+        curve: secp384r1
+    - name: Generate CSR
+      community.crypto.openssl_csr:
+        path: "{{ letsencrypt_csrs_dir }}/{{ domain_name }}.csr"
+        privatekey_path: "{{ letsencrypt_keys_dir }}/{{ domain_name }}.key"
+        common_name: "{{ domain_name }}"
+        subject_alt_name: "{{ ['DNS:'] | product(alt_names) | map('join') }}"
+    - name: Create a challenge for {{ domain_name }}
+      community.crypto.acme_certificate:
+        terms_agreed: "{{ acme_terms_agreed }}"
+        acme_version: "{{ acme_version }}"
+        acme_directory: "{{ acme_directory }}"
+        account_key_src: "{{ letsencrypt_account_key }}"
+        csr: "{{ letsencrypt_csrs_dir }}/{{ domain_name }}.csr"
+        dest: "{{ letsencrypt_certs_dir }}/{{ domain_name }}.crt"
+      register: letsencrypt_challenge
+    - name: Copy the challenge data to the web sever
+      ansible.builtin.copy:
+        dest: /var/www/html/{{ item.value['http-01']['resource'] }}
+        content: "{{ item.value['http-01']['resource_value'] }}"
+        mode: 0644
+      loop: "{{ letsencrypt_challenge['challenge_data'] | dict2items }}"
+      when: letsencrypt_challenge is changed
+    - name: Complete the challenge for {{ domain_name }} and get certificates
+      community.crypto.acme_certificate:
+        acme_directory: "{{ acme_directory }}"
+        acme_version: "{{ acme_version }}"
+        account_key_src: "{{ letsencrypt_account_key }}"
+        account_email: "{{ acme_email }}"
+        terms_agreed: "{{ acme_terms_agreed }}"
+        challenge: "{{ acme_challenge_type }}"
+        src: "{{ letsencrypt_csrs_dir }}/{{ domain_name }}.csr"
+        cert: "{{ letsencrypt_certs_dir }}/{{ domain_name }}.crt"
+        fullchain_dest: "{{ letsencrypt_certs_dir }}/fullchain_{{ domain_name }}.crt"
+        remaining_days: 14
+        chain_dest: "{{ letsencrypt_certs_dir }}/{{ domain_name }}-intermediate.crt"
+        data: "{{ letsencrypt_challenge }}"
+      notify:
+        - Reload nginx
+    - name: Install HTTPS config
+      ansible.builtin.template:
+        src: files/{{ nginx_config }}-nginx-https.conf.j2
+        dest: /etc/nginx/conf.d/http.conf
+      notify:
+        - Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
