@@ -19,4 +19,5 @@ web:
     letsencrypt_csrs_dir: /etc/letsencrypt/csrs
     letsencrypt_certs_dir: /etc/letsencrypt/certs
     letsencrypt_account_key: /etc/letsencrypt/account/account.key
-    nginx_base_well_known: /var/www/html/.well-known
+    nginx_base_dir: /var/www/html
+    force_regenerate: false

@@ -11,6 +11,6 @@ server {
   }
 
   location /.well-known/ {
-    root /var/www/html;
+    root {{ nginx_base_dir }};
   }
 }
