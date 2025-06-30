@@ -3,10 +3,10 @@ web:
     myip:
       http_port: 80
       https_port: 443
-      domain_name: myip.kylelaker.com
+      domain_name: myip.laurelmay.me
       alt_names:
-        - v4.myip.kylelaker.com
-        - v6.myip.kylelaker.com
+        - v4.myip.laurelmay.me
+        - v6.myip.laurelmay.me
       nginx_config: myip
   vars:
     acme_challenge_type: http-01
@@ -19,5 +19,6 @@ web:
     letsencrypt_csrs_dir: /etc/letsencrypt/csrs
     letsencrypt_certs_dir: /etc/letsencrypt/certs
     letsencrypt_account_key: /etc/letsencrypt/account/account.key
+    letsencrypt_profile: tlsserver
     nginx_base_dir: /var/www/html
     force_regenerate: false

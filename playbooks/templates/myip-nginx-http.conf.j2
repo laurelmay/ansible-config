@@ -4,6 +4,8 @@ server {
 
   server_name {{ ([domain_name] + alt_names) | join(' ') }};
 
+  access_log /var/log/nginx/access.log request_time;
+
   location = / {
     gzip off;
     default_type "text/plain";

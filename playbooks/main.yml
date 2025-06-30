@@ -1,10 +1,4 @@
 ---
-- name: Test connection
-  hosts: all
-  tasks:
-    - name: Ping hosts
-      ansible.builtin.ping:
-
 - name: Setup Nginx
   hosts: web
   become: true
@@ -32,19 +26,39 @@
           Pin: origin nginx.org
           Pin: release o=nginx
           Pin-Priority: 900
-    - name: Install nginx
+        mode: "0644"
+    - name: Install nginx  # noqa package-latest
       ansible.builtin.apt:
         name: nginx
         state: latest
-        update_cache: yes
+        update_cache: true
       notify:
         - Restart nginx
+    - name: Deny IMDS IPv4 access to nginx
+      ansible.builtin.iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination: 169.254.169.254
+        uid_owner: nginx
+        jump: REJECT
+        ip_version: ipv4
+      when: 'is_aws'
+    - name: Deny IMDS IPv6 access to nginx
+      ansible.builtin.iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination: 'fd00:ec2::254'
+        uid_owner: nginx
+        jump: REJECT
+        ip_version: ipv6
+      when: 'is_aws'
     - name: Install updated nginx config
       ansible.builtin.copy:
-        src: ../files/nginx.conf
+        src: nginx.conf
         dest: /etc/nginx/nginx.conf
         # This file is shipped by default and needs to be replaced
         force: true
+        mode: "0644"
       notify:
         - Reload nginx
     - name: Delete default nginx config
@@ -53,8 +67,9 @@
         state: absent
     - name: Install HTTP config
       ansible.builtin.template:
-        src: ../files/{{ nginx_config }}-nginx-http.conf.j2
+        src: "{{ nginx_config }}-nginx-http.conf.j2"
         dest: /etc/nginx/conf.d/http.conf
+        mode: "0644"
       notify:
         - Reload nginx
     - name: Enable nginx systemd service
@@ -98,6 +113,7 @@
         acme_version: "{{ acme_version }}"
         acme_directory: "{{ acme_directory }}"
         account_key_src: "{{ letsencrypt_account_key }}"
+        profile: "{{ letsencrypt_profile }}"
         csr: "{{ letsencrypt_csrs_dir }}/{{ domain_name }}.csr"
         dest: "{{ letsencrypt_certs_dir }}/{{ domain_name }}.crt"
         select_chain:
@@ -109,10 +125,10 @@
       ansible.builtin.copy:
         dest: /var/www/html/{{ item.value['http-01']['resource'] }}
         content: "{{ item.value['http-01']['resource_value'] }}"
-        mode: 0644
+        mode: "0644"
       loop: "{{ letsencrypt_challenge['challenge_data'] | dict2items }}"
-      when: letsencrypt_challenge is changed
-    - name: Complete the challenge for {{ domain_name }} and get certificates
+      when: "'challenge_data' in letsencrypt_challenge"
+    - name: Complete the challenge and get certificates for {{ domain_name }}
       community.crypto.acme_certificate:
         acme_directory: "{{ acme_directory }}"
         acme_version: "{{ acme_version }}"
@@ -124,6 +140,7 @@
         cert: "{{ letsencrypt_certs_dir }}/{{ domain_name }}.crt"
         fullchain_dest: "{{ letsencrypt_certs_dir }}/fullchain_{{ domain_name }}.crt"
         remaining_days: 14
+        profile: "{{ letsencrypt_profile }}"
         chain_dest: "{{ letsencrypt_certs_dir }}/{{ domain_name }}-intermediate.crt"
         data: "{{ letsencrypt_challenge }}"
         select_chain:
@@ -134,8 +151,9 @@
         - Reload nginx
     - name: Install HTTPS config
       ansible.builtin.template:
-        src: ../files/{{ nginx_config }}-nginx-https.conf.j2
+        src: "{{ nginx_config }}-nginx-https.conf.j2"
         dest: /etc/nginx/conf.d/https.conf
+        mode: "0644"
       notify:
         - Reload nginx
 
