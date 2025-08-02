@@ -34,24 +34,22 @@
         update_cache: true
       notify:
         - Restart nginx
-    - name: Deny IMDS IPv4 access to nginx
-      ansible.builtin.iptables:
-        chain: OUTPUT
-        protocol: tcp
-        destination: 169.254.169.254
-        uid_owner: nginx
-        jump: REJECT
-        ip_version: ipv4
+    - name: Install nftables rules
+      ansible.builtin.copy:
+        src: imds.nft
+        dest: /etc/nftables.d/
+        force: true
+        mode: '0644'
+        owner: root
       when: 'is_aws'
-    - name: Deny IMDS IPv6 access to nginx
-      ansible.builtin.iptables:
-        chain: OUTPUT
-        protocol: tcp
-        destination: 'fd00:ec2::254'
-        uid_owner: nginx
-        jump: REJECT
-        ip_version: ipv6
-      when: 'is_aws'
+      notify:
+        - Reload nftables
+    - name: Load nftables rules
+      ansible.builtin.lineinfile:
+        dest: '/etc/nftables.conf'
+        line: include "/etc/nftables.d/imds.nft"
+      notify:
+        - Reload nftables
     - name: Install updated nginx config
       ansible.builtin.copy:
         src: nginx.conf
@@ -166,3 +164,6 @@
       ansible.builtin.service:
         name: nginx
         state: restarted
+    - name: Reload nftables
+      ansible.builtin.command:
+        cmd: nft -f /etc/nftables.conf

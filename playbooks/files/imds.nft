@@ -1,0 +1,35 @@
+table ip filter {
+  chain input {
+    type filter hook input priority 0;
+    policy accept;
+  }
+
+  chain forward {
+    type filter hook forward priority 0;
+    policy accept;
+  }
+
+  chain output {
+    type filter hook output priority 0;
+    policy accept;
+    ip protocol tcp ip daddr 169.254.169.254 skuid 998 counter reject
+  }
+}
+
+table ip6 filter {
+  chain input {
+    type filter hook input priority 0;
+    policy accept;
+  }
+
+  chain forward {
+    type filter hook forward priority 0;
+    policy accept;
+  }
+
+  chain output {
+    type filter hook output priority 0;
+    policy accept;
+    meta l4proto tcp ip6 daddr fd00:ec2::254 skuid 998 counter reject
+  }
+}
