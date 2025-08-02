@@ -6,22 +6,33 @@ server {
 
   access_log /var/log/nginx/access.log request_time;
 
-  if ($is_allowed_method = 0) {
-    add_header Allow "GET, HEAD";
-    return 405 "Method Not Allowed\n";
-  }
-
   location = / {
+    if ($is_allowed_method = 0) {
+      add_header Allow "GET, HEAD";
+      return 405 "Method Not Allowed\n";
+    }
+
     gzip off;
     default_type "text/plain";
     return 200 $remote_addr;
   }
 
   location / {
+    if ($is_allowed_method = 0) {
+      add_header Allow "GET, HEAD";
+      return 405 "Method Not Allowed\n";
+    }
+
+    default_type "text/plain";
     return 400 "Not Found\n";
   }
 
   location /.well-known/ {
+    if ($is_allowed_method = 0) {
+      add_header Allow "GET, HEAD";
+      return 405 "Method Not Allowed\n";
+    }
+
     root {{ nginx_base_dir }};
   }
 }
