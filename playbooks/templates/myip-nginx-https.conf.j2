@@ -1,3 +1,13 @@
+acme_issuer {{ nginx_config }} {
+  uri         {{ acme_directory }};
+  contact     {{ acme_email }};
+  state_path  /var/cache/nginx/acme-{{ nginx_config }};
+  account_key ecdsa:256;
+{% if acme_terms_agreed == 1 %}
+  accept_terms_of_service;
+{% endif %}
+}
+
 server {
   listen      {{ https_port }} ssl;
   listen [::]:{{ https_port }} ssl ipv6only=on;
@@ -7,11 +17,13 @@ server {
 
   server_name {{ ([domain_name] + alt_names) | join(' ') }};
 
-  ssl_certificate {{ letsencrypt_certs_dir }}/fullchain_{{ domain_name }}.crt;
-  ssl_certificate_key {{ letsencrypt_keys_dir }}/{{ domain_name }}.key;
+  acme_certificate      {{ nginx_config }} key=ecdsa:384;
+  ssl_certificate       $acme_certificate;
+  ssl_certificate_key   $acme_certificate_key;
+  ssl_certificate_cache max=2;
 
   ssl_protocols TLSv1.3;
-  ssl_ciphers "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384";
+  ssl_ciphers   "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384";
   ssl_prefer_server_ciphers on;
 
   access_log  /var/log/nginx/access.log request_time;
