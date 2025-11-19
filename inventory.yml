@@ -12,6 +12,8 @@ web:
     acme_challenge_type: http-01
     # acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
     acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    acme_profile: "tlsserver"
+    acme_issuer: "ISRG Root X2"
     acme_version: 2
     acme_terms_agreed: 1
     nginx_base_dir: /var/www/html

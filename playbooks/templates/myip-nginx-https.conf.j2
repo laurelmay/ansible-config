@@ -2,6 +2,8 @@ acme_issuer {{ nginx_config }} {
   uri         {{ acme_directory }};
   contact     {{ acme_email }};
   state_path  /var/cache/nginx/acme-{{ nginx_config }};
+  profile     "{{ acme_profile }}" require;
+  preferred_chain "{{ acme_issuer }}";
   account_key ecdsa:256;
 {% if acme_terms_agreed == 1 %}
   accept_terms_of_service;
